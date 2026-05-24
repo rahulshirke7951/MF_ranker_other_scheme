@@ -1,0 +1,54 @@
+name: Weekly MF Ranker
+
+on:
+  schedule:
+    - cron: '30 20 * * 5'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run-ranker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Download data file
+        run: |
+          python scripts/download_data.py
+
+      - name: Run ranking script
+        run: |
+          python scripts/mf_fund_ranker.py
+
+      - name: Save latest output
+        run: |
+          mkdir -p output
+          mv mf_ranked_screener.xlsx output/mf_ranked_latest.xlsx
+
+      - name: Commit latest output
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "actions@github.com"
+
+          git add output/mf_ranked_latest.xlsx
+          git commit -m "📊 Update latest MF ranking" || echo "No changes to commit"
+          git push
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mf-ranked-latest
+          path: output/mf_ranked_latest.xlsx
