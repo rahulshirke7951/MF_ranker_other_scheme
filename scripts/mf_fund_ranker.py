@@ -47,7 +47,7 @@ TREND_BONUS = 5.0
 
 FILTERS = {
     "cat_level_1": "Open Ended Schemes",
-    "cat_level_2": "Equity Scheme",
+    "cat_level_2": "Other Scheme",
     "plan_type":   "Regular",
     "option_type": "Growth",
 }
