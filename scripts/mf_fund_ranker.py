@@ -72,7 +72,7 @@ ASSET_TAG_RULES = [
     {"tag": "GILT", "contains": ["gilt"], "priority": 4},
     {"tag": "NASDAQ", "contains": ["nasdaq", "nq100", "nq 100"], "priority": 5},
     {"tag": "S&P 500", "contains": ["s&p 500", "s&p500", "s&p 50"], "priority": 6},
-    {"tag": "International", "contains": ["overseas", "global", "us equity", "emerging market", "china", "hang seng", "greater china", "world"], "priority": 7},
+    {"tag": "International", "contains": ["overseas", "global", "hang seng", "china", "greater china", "world", "emerging market"], "priority": 7},
     {"tag": "Pharma/Healthcare", "contains": ["pharma", "healthcare", "health"], "priority": 8},
     {"tag": "Technology", "contains": ["tech", "artificial intelligence", "ai ", "fang", "digital"], "priority": 9},
     {"tag": "Commodities", "contains": ["commodit", "metal", "energy", "mining", "oil", "gas"], "priority": 10},
@@ -82,10 +82,9 @@ ASSET_TAG_RULES = [
 ]
 
 # ══════════════════════════════════════════════════════════════════════════════
-# COLORS - Including 3-tier data availability styles
+# COLORS
 # ══════════════════════════════════════════════════════════════════════════════
 class Colors:
-    # Header colors
     TITLE_BG = "0D1117"
     TITLE_FG = "FFFFFF"
     INFO_BG = "F0F4F8"
@@ -93,51 +92,33 @@ class Colors:
     BORDER = "D0D8E4"
     COL_HDR_BG = "1A3A5C"
     COL_HDR_FG = "FFFFFF"
-    
-    # Group header colors
     MOMENTUM_BG = "E8560A"
     MOMENTUM_FG = "FFFFFF"
     LONGTERM_BG = "1E6B8C"
     LONGTERM_FG = "FFFFFF"
     ENGINE_BG = "2D5016"
     ENGINE_FG = "FFFFFF"
-    
-    # Rank colors (Full Data)
     RANK1_BG = "FFD700"
     RANK2_BG = "E8E8E8"
     RANK3_BG = "D4956A"
     ALT_ROW = "F5F8FC"
     WHITE = "FFFFFF"
-    
-    # Return colors
     POSITIVE = "1E7A4B"
     NEGATIVE = "C0392B"
-    
-    # Engine tints
     ENGINE1_TINT = "FFF3E0"
     ENGINE2_TINT = "E3F2FD"
     COMP_TINT = "F0FFF4"
-    
-    # DATA AVAILABILITY STYLES (3-tier)
-    # Tier 1: Full Data - uses rank colors above
-    
-    # Tier 2: Momentum Only (has 1M/3M/6M, missing 2Y/3Y CAGR)
-    MOMENTUM_ONLY_BG = "FFF8E1"      # Light Amber
-    MOMENTUM_ONLY_FG = "E65100"      # Dark Orange text
-    
-    # Tier 3: Missing Critical Data (missing short-term returns)
-    MISSING_DATA_BG = "ECEFF1"       # Light Blue-Gray
-    MISSING_DATA_FG = "78909C"       # Blue-Gray text
-    
-    # Assumptions sheet
+    MOMENTUM_ONLY_BG = "FFF8E1"
+    MOMENTUM_ONLY_FG = "E65100"
+    MISSING_DATA_BG = "ECEFF1"
+    MISSING_DATA_FG = "78909C"
     ASMP_TITLE = "0D1117"
     ASMP_BLEND = "2D5016"
     ASMP_ROW_BL = "EAFAF1"
-    
-    # Legend colors
     LEGEND_FULL = "E8F5E9"
     LEGEND_MOMENTUM = "FFF8E1"
     LEGEND_MISSING = "ECEFF1"
+    CONSOLIDATED_BG = "1565C0"  # Blue for consolidated sheet
 
 C = Colors()
 
@@ -190,7 +171,6 @@ def calculate_trend_strength(row: pd.Series) -> Tuple[float, str]:
     r1m, r3m, r6m = row["_r1m"], row["_r3m"], row["_r6m"]
     if pd.isna(r1m) or pd.isna(r3m) or pd.isna(r6m):
         return 0, ""
-    
     if r6m > r3m > r1m:
         return CONFIG.TREND_BONUS, "📈 Uptrend"
     elif r6m > r3m or r3m > r1m:
@@ -200,18 +180,10 @@ def calculate_trend_strength(row: pd.Series) -> Tuple[float, str]:
     return 0, ""
 
 def classify_data_status(row: pd.Series) -> str:
-    """
-    Classify data availability into 3 tiers:
-    - FULL: All momentum (1M/3M/6M) and long-term (1Y/2Y/3Y) data available
-    - MOMENTUM_ONLY: Has momentum data but missing long-term (2Y CAGR or 3Y CAGR)
-    - MISSING: Missing critical momentum data (1M, 3M, or 6M)
-    """
     momentum_cols = ["_r1m", "_r3m", "_r6m"]
     longterm_cols = ["_r2y_cagr", "_r3y"]
-    
     has_momentum = not row[momentum_cols].isna().any()
     has_longterm = not row[longterm_cols].isna().any()
-    
     if has_momentum and has_longterm:
         return "FULL"
     elif has_momentum and not has_longterm:
@@ -221,8 +193,6 @@ def classify_data_status(row: pd.Series) -> str:
 
 def score_funds(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    
-    # Numeric conversions
     df["_r1m"] = to_num(df[COLUMN_MAP["return_1m"]])
     df["_r3m"] = to_num(df[COLUMN_MAP["return_3m"]])
     df["_r6m"] = to_num(df[COLUMN_MAP["return_6m"]])
@@ -231,38 +201,27 @@ def score_funds(df: pd.DataFrame) -> pd.DataFrame:
     df["_r2y_cagr"] = df["_r2y_raw"].apply(cagr_2y)
     df["_r3y"] = to_num(df[COLUMN_MAP["return_3y"]])
     df["_cat"] = df[COLUMN_MAP["category"]].astype(str).str.strip().str.title()
-    
-    # Asset classification
     df["_asset_class"] = df[COLUMN_MAP["scheme_name"]].apply(assign_asset_tag)
-    
-    # 3-tier data status classification
     df["_data_status"] = df.apply(classify_data_status, axis=1)
-    
-    # Legacy compatibility
     df["_has_missing_data"] = df["_data_status"] == "MISSING"
     
-    # Quality filters with drawdown protection
     mask_2y = df["_r2y_cagr"] > (QUALITY_FILTERS["cagr_2y_min"] * 100)
     mask_3y = df["_r3y"] > (QUALITY_FILTERS["cagr_3y_min"] * 100)
     mask_drawdown = df["_r1y"] > QUALITY_FILTERS["min_1y_return"]
     df["_qualifies"] = mask_2y & mask_3y & mask_drawdown & (df["_data_status"] == "FULL")
     
-    # Trend calculation
     trend_results = df.apply(calculate_trend_strength, axis=1)
     df["_trend_bonus"] = trend_results.apply(lambda x: x[0])
     df["_trend"] = trend_results.apply(lambda x: x[1])
     
-    # Initialize engine scores
     df["_e1"] = 0.0
     df["_e2"] = 0.0
     
-    # Category-wise scoring
     for cat in df["_cat"].unique():
         cm = df["_cat"] == cat
         cq = cm & df["_qualifies"]
-        
-        # Engine 1: Momentum (for FULL and MOMENTUM_ONLY)
         valid_m_mask = cm & (df["_data_status"].isin(["FULL", "MOMENTUM_ONLY"]))
+        
         if valid_m_mask.sum() > 0:
             e1 = (pct_rank(df.loc[valid_m_mask, "_r6m"]) * ENGINE1_WEIGHTS["return_6m"] +
                   pct_rank(df.loc[valid_m_mask, "_r3m"]) * ENGINE1_WEIGHTS["return_3m"] +
@@ -271,25 +230,18 @@ def score_funds(df: pd.DataFrame) -> pd.DataFrame:
             e1 = e1 + df.loc[valid_m_mask, "_trend_bonus"]
             df.loc[valid_m_mask, "_e1"] = e1.clip(0, 100)
         
-        # Engine 2: Quality (only for FULL data that qualifies)
         if cq.sum() > 0:
             e2 = (pct_rank(df.loc[cq, "_r1y"]) * ENGINE2_WEIGHTS["return_1y"] +
                   pct_rank(df.loc[cq, "_r2y_cagr"]) * ENGINE2_WEIGHTS["return_2y"] +
                   pct_rank(df.loc[cq, "_r3y"]) * ENGINE2_WEIGHTS["return_3y"])
             df.loc[cq, "_e2"] = e2
     
-    # Composite score
     df["_comp"] = (df["_e1"] * COMPOSITE_BLEND["engine1_momentum"] +
                    df["_e2"] * COMPOSITE_BLEND["engine2_quality"])
-    
-    # Penalize missing data
     df.loc[df["_data_status"] == "MISSING", "_comp"] = -1.0
-    
-    # Ranking within category
     df["_rank"] = (df.groupby("_cat")["_comp"]
                    .rank(method='min', ascending=False)
                    .astype(int))
-    
     return df
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -324,7 +276,6 @@ def score_col(val) -> str:
     return C.NEGATIVE
 
 def signal(comp: float, trend: str = "", e1: float = 0, e2: float = 0, data_status: str = "FULL") -> str:
-    """Generate investment signal with data status awareness."""
     if data_status == "MISSING":
         return "❌ Missing Data"
     if data_status == "MOMENTUM_ONLY":
@@ -333,8 +284,6 @@ def signal(comp: float, trend: str = "", e1: float = 0, e2: float = 0, data_stat
         elif e1 >= 60:
             return "📈 Momentum Only"
         return "⏳ New Fund"
-    
-    # Full data signals
     if comp >= 85 and "Uptrend" in str(trend):
         return "🚀 Strong Conviction"
     if comp >= 75:
@@ -359,19 +308,13 @@ def dfont(size: int = 9, bold: bool = False, color: str = "000000") -> Font:
     return Font(name="Arial", bold=bold, size=size, color=color)
 
 def get_row_style(row, row_num: int):
-    """
-    Returns (background_color, font_color, is_italic, is_bold) based on data status and rank.
-    """
     data_status = row["_data_status"]
     rank = row["_rank"]
-    
     if data_status == "MISSING":
         return (C.MISSING_DATA_BG, C.MISSING_DATA_FG, True, False)
-    
     elif data_status == "MOMENTUM_ONLY":
         return (C.MOMENTUM_ONLY_BG, C.MOMENTUM_ONLY_FG, True, False)
-    
-    else:  # FULL data
+    else:
         if rank == 1:
             return (C.RANK1_BG, "000000", False, True)
         elif rank == 2:
@@ -382,7 +325,7 @@ def get_row_style(row, row_num: int):
             bg = C.ALT_ROW if row_num % 2 == 0 else C.WHITE
             return (bg, "000000", False, False)
 
-# Column layout
+# Column layouts
 MOMENTUM_COLS = (5, 7)
 LONGTERM_COLS = (8, 10)
 ENGINE_COLS = (11, 13)
@@ -401,21 +344,31 @@ COL_HEADERS_SUMMARY = [
     "Engine 1\n(Momentum)", "Engine 2\n(Quality)", "Composite\nScore", "Signal"
 ]
 
+# NEW: Consolidated sheet headers (includes Category + Signal)
+COL_HEADERS_CONSOLIDATED = [
+    "Rank", "Scheme Name", "AMC", "Category", "Asset Class",
+    "1M\nReturn", "3M\nReturn", "6M\nReturn",
+    "1Y\nReturn", "2Y\nCAGR", "3Y\nCAGR",
+    "Engine 1\n(Momentum)", "Engine 2\n(Quality)", "Composite\nScore", "Signal", "Data Status"
+]
+
 COL_WIDTHS = [6, 50, 20, 18, 9, 9, 9, 9, 9, 9, 14, 14, 12]
 COL_WIDTHS_SUMMARY = [6, 18, 45, 22, 16, 9, 9, 9, 9, 9, 9, 12, 12, 12, 16]
+COL_WIDTHS_CONSOLIDATED = [6, 45, 22, 16, 16, 9, 9, 9, 9, 9, 9, 12, 12, 12, 16, 14]
+
 RETURN_COLS_IDX = {5, 6, 7, 8, 9, 10}
 RETURN_COLS_IDX_SUMMARY = {6, 7, 8, 9, 10, 11}
+RETURN_COLS_IDX_CONSOLIDATED = {6, 7, 8, 9, 10, 11}
 
 # ══════════════════════════════════════════════════════════════════════════════
-# BUILD CATEGORY SHEET
+# BUILD CATEGORY SHEET - WITH DYNAMIC ROW 2
 # ══════════════════════════════════════════════════════════════════════════════
 def build_category_sheet(wb, cat, cat_df):
     ws = wb.create_sheet(clean_name(cat))
     bd = border()
-    total = len(cat_df)
-    qualified = int(cat_df["_qualifies"].sum())
-    momentum_only = int((cat_df["_data_status"] == "MOMENTUM_ONLY").sum())
     ncols = len(COL_HEADERS)
+    data_start_row = 5
+    data_end_row = data_start_row + len(cat_df) - 1
 
     # Title row
     ws.merge_cells(f"A1:{get_column_letter(ncols)}1")
@@ -426,12 +379,26 @@ def build_category_sheet(wb, cat, cat_df):
     c.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 32
 
-    # Info row with data status counts
+    # DYNAMIC Info row using Excel formulas
     ws.merge_cells(f"A2:{get_column_letter(ncols)}2")
-    c = ws["A2"]
     e1_pct = int(COMPOSITE_BLEND["engine1_momentum"] * 100)
     e2_pct = int(COMPOSITE_BLEND["engine2_quality"] * 100)
-    c.value = f"Dual Engine: {e1_pct}% Momentum + {e2_pct}% Quality | ✅ Full Data: {qualified} | ⚠️ Momentum Only: {momentum_only} | Total: {total}"
+    
+    # Formula-based dynamic counts
+    # Total = count of non-empty ranks + count of "—" in rank column
+    # Full Data = count where Engine 2 (L) is numeric (not "—" or "N/A")
+    # Momentum Only = count where Engine 1 (K) is numeric but Engine 2 (L) is "N/A" or "—"
+    
+    dynamic_formula = (
+        f'="Dual Engine: {e1_pct}% Momentum + {e2_pct}% Quality | '
+        f'✅ Full Data: "&COUNTIF(L{data_start_row}:L{data_end_row},">0")&" | '
+        f'⚠️ Momentum Only: "&COUNTIF(L{data_start_row}:L{data_end_row},"N/A")&" | '
+        f'❌ Missing: "&COUNTIF(K{data_start_row}:K{data_end_row},"—")&" | '
+        f'Total: "&COUNTA(B{data_start_row}:B{data_end_row})'
+    )
+    
+    c = ws["A2"]
+    c.value = dynamic_formula
     c.font = Font(name="Arial", italic=True, size=8.5, color=C.INFO_FG)
     c.fill = fill(C.INFO_BG)
     c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
@@ -467,25 +434,22 @@ def build_category_sheet(wb, cat, cat_df):
     ws.row_dimensions[4].height = 28
 
     # Data rows
-    for i, (_, row) in enumerate(cat_df.iterrows(), 5):
+    for i, (_, row) in enumerate(cat_df.iterrows(), data_start_row):
         rank = row["_rank"]
         data_status = row["_data_status"]
-        
-        # Get appropriate styling based on data status
         rbg, text_color, is_italic, is_bold = get_row_style(row, i)
         
-        # Build row values
         if data_status == "MISSING":
             rank_val = "—"
             e1_val = "—"
             e2_val = "—"
             comp_val = "—"
         elif data_status == "MOMENTUM_ONLY":
-            rank_val = f"({rank})"  # Parentheses to indicate partial ranking
+            rank_val = f"({rank})"
             e1_val = round(row["_e1"], 1)
             e2_val = "N/A"
             comp_val = "—"
-        else:  # FULL
+        else:
             rank_val = rank
             e1_val = round(row["_e1"], 1)
             e2_val = round(row["_e2"], 1)
@@ -507,37 +471,34 @@ def build_category_sheet(wb, cat, cat_df):
             c.fill = fill(rbg)
             c.alignment = Alignment(horizontal="left" if ci in {2, 3, 4} else "center", vertical="center")
             
-            # Apply text styling based on data status
             if data_status == "MISSING":
                 c.font = Font(name="Arial", italic=True, size=9, color=C.MISSING_DATA_FG)
             elif data_status == "MOMENTUM_ONLY":
                 if ci in RETURN_COLS_IDX and isinstance(val, str) and val != "—":
                     try:
                         num = float(val.replace('%', ''))
-                        c.font = Font(name="Arial", italic=True, size=9, 
-                                     color=C.POSITIVE if num >= 0 else C.NEGATIVE)
+                        c.font = Font(name="Arial", italic=True, size=9, color=C.POSITIVE if num >= 0 else C.NEGATIVE)
                     except:
                         c.font = Font(name="Arial", italic=True, size=9, color=C.MOMENTUM_ONLY_FG)
-                elif ci == 11:  # Engine 1 for momentum only
+                elif ci == 11:
                     c.font = Font(name="Arial", bold=True, italic=True, size=9, color=score_col(val))
                     c.fill = fill(C.ENGINE1_TINT)
                 else:
                     c.font = Font(name="Arial", italic=True, size=9, color=C.MOMENTUM_ONLY_FG)
-            else:  # FULL data
+            else:
                 if ci in RETURN_COLS_IDX and isinstance(val, str) and val != "—":
                     try:
                         num = float(val.replace('%', ''))
-                        c.font = Font(name="Arial", bold=is_bold, size=9,
-                                     color=C.POSITIVE if num >= 0 else C.NEGATIVE)
+                        c.font = Font(name="Arial", bold=is_bold, size=9, color=C.POSITIVE if num >= 0 else C.NEGATIVE)
                     except:
                         c.font = dfont(bold=is_bold)
-                elif ci == 11:  # Engine 1
+                elif ci == 11:
                     c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                     c.fill = fill(C.ENGINE1_TINT)
-                elif ci == 12:  # Engine 2
+                elif ci == 12:
                     c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                     c.fill = fill(C.ENGINE2_TINT)
-                elif ci == 13:  # Composite
+                elif ci == 13:
                     c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                     c.fill = fill(C.COMP_TINT)
                 else:
@@ -545,24 +506,22 @@ def build_category_sheet(wb, cat, cat_df):
         
         ws.row_dimensions[i].height = 16
 
-    # Column widths
     for ci, w in enumerate(COL_WIDTHS, 1):
         ws.column_dimensions[get_column_letter(ci)].width = w
     
-    # Auto-filter and freeze
-    ws.auto_filter.ref = f"A4:{get_column_letter(ncols)}{4 + len(cat_df)}"
+    ws.auto_filter.ref = f"A4:{get_column_letter(ncols)}{data_end_row}"
     ws.freeze_panes = "A5"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# BUILD SUMMARY SHEET - BY ASSET CLASS
+# BUILD SUMMARY SHEET - BY ASSET CLASS WITH DYNAMIC ROW 2
 # ══════════════════════════════════════════════════════════════════════════════
 def build_summary(wb, df_scored):
     ws = wb.create_sheet("🏆 SUMMARY", 0)
     bd = border()
     ncols = len(COL_HEADERS_SUMMARY)
-    
-    # Get unique asset classes and find top performer in each
     asset_classes = sorted(df_scored["_asset_class"].unique())
+    data_start_row = 5
+    data_end_row = data_start_row + len(asset_classes) - 1
     
     # Title
     ws.merge_cells(f"A1:{get_column_letter(ncols)}1")
@@ -573,14 +532,19 @@ def build_summary(wb, df_scored):
     c.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 34
 
-    # Info row
-    ws.merge_cells(f"A2:{get_column_letter(ncols)}2")
-    c = ws["A2"]
+    # DYNAMIC Info row
     e1_pct = int(COMPOSITE_BLEND["engine1_momentum"] * 100)
     e2_pct = int(COMPOSITE_BLEND["engine2_quality"] * 100)
-    total_funds = len(df_scored)
-    full_data = len(df_scored[df_scored["_data_status"] == "FULL"])
-    c.value = f"Top Performer per Asset Class | {e1_pct}% Momentum + {e2_pct}% Quality | ✅ {full_data}/{total_funds} funds with full data"
+    
+    dynamic_formula = (
+        f'="Top Performer per Asset Class | {e1_pct}% Momentum + {e2_pct}% Quality | '
+        f'Total Asset Classes: "&COUNTA(B{data_start_row}:B{data_end_row})&" | '
+        f'⭐ Strong Buy+: "&COUNTIF(O{data_start_row}:O{data_end_row},"*Strong*")'
+    )
+    
+    ws.merge_cells(f"A2:{get_column_letter(ncols)}2")
+    c = ws["A2"]
+    c.value = dynamic_formula
     c.font = Font(name="Arial", italic=True, size=8.5, color=C.INFO_FG)
     c.fill = fill(C.INFO_BG)
     c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
@@ -605,7 +569,6 @@ def build_summary(wb, df_scored):
             ws.cell(row=3, column=ci).fill = fill(bg)
             ws.cell(row=3, column=ci).border = bd
     
-    # Signal column header background
     ws.cell(row=3, column=15).fill = fill(C.COL_HDR_BG)
     ws.cell(row=3, column=15).border = bd
     ws.row_dimensions[3].height = 18
@@ -619,12 +582,10 @@ def build_summary(wb, df_scored):
         c.border = bd
     ws.row_dimensions[4].height = 28
 
-    # Data rows - one per asset class
+    # Data rows
     rank_counter = 1
-    for i, asset_class in enumerate(asset_classes, 5):
+    for i, asset_class in enumerate(asset_classes, data_start_row):
         asset_df = df_scored[df_scored["_asset_class"] == asset_class].copy()
-        
-        # Sort by composite score (full data first, then momentum only)
         asset_df = asset_df.sort_values(["_data_status", "_comp"], 
                                         ascending=[True, False], 
                                         key=lambda x: x.map({"FULL": 0, "MOMENTUM_ONLY": 1, "MISSING": 2}) if x.name == "_data_status" else x)
@@ -636,7 +597,6 @@ def build_summary(wb, df_scored):
         data_status = top["_data_status"]
         rbg, text_color, is_italic, is_bold = get_row_style(top, i)
         
-        # Determine display values based on data status
         if data_status == "MISSING":
             rank_val = "—"
             e1_val = "—"
@@ -721,15 +681,238 @@ def build_summary(wb, df_scored):
         
         ws.row_dimensions[i].height = 18
 
-    # Column widths
     for ci, w in enumerate(COL_WIDTHS_SUMMARY, 1):
         ws.column_dimensions[get_column_letter(ci)].width = w
     
-    ws.auto_filter.ref = f"A4:{get_column_letter(ncols)}{4 + len(asset_classes)}"
+    ws.auto_filter.ref = f"A4:{get_column_letter(ncols)}{data_end_row}"
     ws.freeze_panes = "A5"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# BUILD ASSUMPTIONS SHEET WITH LEGEND
+# NEW: BUILD CONSOLIDATED SHEET - ALL FUNDS IN ONE PLACE
+# ══════════════════════════════════════════════════════════════════════════════
+def build_consolidated_sheet(wb, df_scored):
+    """Create a consolidated sheet with ALL funds from all categories, sorted by composite score."""
+    ws = wb.create_sheet("📊 CONSOLIDATED")
+    bd = border()
+    ncols = len(COL_HEADERS_CONSOLIDATED)
+    
+    # Sort all funds by composite score (descending), then by data status
+    df_all = df_scored.copy()
+    df_all = df_all.sort_values(
+        ["_data_status", "_comp"], 
+        ascending=[True, False],
+        key=lambda x: x.map({"FULL": 0, "MOMENTUM_ONLY": 1, "MISSING": 2}) if x.name == "_data_status" else x
+    ).reset_index(drop=True)
+    
+    data_start_row = 5
+    data_end_row = data_start_row + len(df_all) - 1
+
+    # Title row
+    ws.merge_cells(f"A1:{get_column_letter(ncols)}1")
+    c = ws["A1"]
+    c.value = "📊 CONSOLIDATED VIEW — ALL FUNDS RANKED"
+    c.font = Font(name="Arial", bold=True, size=15, color=C.TITLE_FG)
+    c.fill = fill(C.CONSOLIDATED_BG)
+    c.alignment = Alignment(horizontal="center", vertical="center")
+    ws.row_dimensions[1].height = 34
+
+    # DYNAMIC Info row with formulas
+    e1_pct = int(COMPOSITE_BLEND["engine1_momentum"] * 100)
+    e2_pct = int(COMPOSITE_BLEND["engine2_quality"] * 100)
+    
+    dynamic_formula = (
+        f'="All Funds Consolidated | {e1_pct}% Momentum + {e2_pct}% Quality | '
+        f'✅ Full: "&COUNTIF(P{data_start_row}:P{data_end_row},"FULL")&" | '
+        f'⚠️ Momentum: "&COUNTIF(P{data_start_row}:P{data_end_row},"MOMENTUM_ONLY")&" | '
+        f'❌ Missing: "&COUNTIF(P{data_start_row}:P{data_end_row},"MISSING")&" | '
+        f'Total: "&COUNTA(B{data_start_row}:B{data_end_row})'
+    )
+    
+    ws.merge_cells(f"A2:{get_column_letter(ncols)}2")
+    c = ws["A2"]
+    c.value = dynamic_formula
+    c.font = Font(name="Arial", italic=True, size=8.5, color=C.INFO_FG)
+    c.fill = fill(C.INFO_BG)
+    c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[2].height = 16
+
+    # Group headers row 3
+    for ci in range(1, 6):
+        ws.cell(row=3, column=ci).fill = fill(C.COL_HDR_BG)
+        ws.cell(row=3, column=ci).border = bd
+
+    for g_start, g_end, label, bg, fg in [
+        (6, 8, "◄  Momentum  ►", C.MOMENTUM_BG, C.MOMENTUM_FG),
+        (9, 11, "◄  Long-Term  ►", C.LONGTERM_BG, C.LONGTERM_FG),
+        (12, 14, "◄  Engine Scores  ►", C.ENGINE_BG, C.ENGINE_FG)
+    ]:
+        ws.merge_cells(f"{get_column_letter(g_start)}3:{get_column_letter(g_end)}3")
+        cell = ws.cell(row=3, column=g_start, value=label)
+        cell.font = hfont(color=fg)
+        cell.fill = fill(bg)
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+        for ci in range(g_start, g_end + 1):
+            ws.cell(row=3, column=ci).fill = fill(bg)
+            ws.cell(row=3, column=ci).border = bd
+    
+    # Signal and Data Status header backgrounds
+    for ci in [15, 16]:
+        ws.cell(row=3, column=ci).fill = fill(C.COL_HDR_BG)
+        ws.cell(row=3, column=ci).border = bd
+    ws.row_dimensions[3].height = 18
+
+    # Column headers row 4
+    for ci, hdr in enumerate(COL_HEADERS_CONSOLIDATED, 1):
+        c = ws.cell(row=4, column=ci, value=hdr)
+        c.font = hfont()
+        c.fill = fill(C.COL_HDR_BG)
+        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        c.border = bd
+    ws.row_dimensions[4].height = 28
+
+    # Data rows - Global ranking across all categories
+    global_rank = 1
+    for i, (_, row) in enumerate(df_all.iterrows(), data_start_row):
+        data_status = row["_data_status"]
+        
+        # Determine row style based on global position (not category rank)
+        if data_status == "MISSING":
+            rbg = C.MISSING_DATA_BG
+            text_color = C.MISSING_DATA_FG
+            is_italic = True
+            is_bold = False
+        elif data_status == "MOMENTUM_ONLY":
+            rbg = C.MOMENTUM_ONLY_BG
+            text_color = C.MOMENTUM_ONLY_FG
+            is_italic = True
+            is_bold = False
+        else:
+            # Top 10 get special highlighting
+            if global_rank == 1:
+                rbg = C.RANK1_BG
+                is_bold = True
+            elif global_rank == 2:
+                rbg = C.RANK2_BG
+                is_bold = True
+            elif global_rank == 3:
+                rbg = C.RANK3_BG
+                is_bold = True
+            elif global_rank <= 10:
+                rbg = C.COMP_TINT  # Light green for top 10
+                is_bold = False
+            else:
+                rbg = C.ALT_ROW if i % 2 == 0 else C.WHITE
+                is_bold = False
+            text_color = "000000"
+            is_italic = False
+        
+        # Value assignment
+        if data_status == "MISSING":
+            rank_val = "—"
+            e1_val = "—"
+            e2_val = "—"
+            comp_val = "—"
+        elif data_status == "MOMENTUM_ONLY":
+            rank_val = f"({global_rank})"
+            e1_val = round(row["_e1"], 1)
+            e2_val = "N/A"
+            comp_val = "—"
+            global_rank += 1
+        else:
+            rank_val = global_rank
+            e1_val = round(row["_e1"], 1)
+            e2_val = round(row["_e2"], 1)
+            comp_val = round(row["_comp"], 1)
+            global_rank += 1
+        
+        vals = [
+            rank_val,
+            row.get(COLUMN_MAP["scheme_name"], "—"),
+            row.get(COLUMN_MAP["amc"], "—"),
+            row["_cat"],
+            row["_asset_class"],
+            fmt_pct(row["_r1m"]), fmt_pct(row["_r3m"]), fmt_pct(row["_r6m"]),
+            fmt_pct(row["_r1y"]), fmt_pct(row["_r2y_cagr"]), fmt_pct(row["_r3y"]),
+            e1_val, e2_val, comp_val
+        ]
+
+        for ci, val in enumerate(vals, 1):
+            c = ws.cell(row=i, column=ci, value=val)
+            c.border = bd
+            c.fill = fill(rbg)
+            c.alignment = Alignment(horizontal="left" if ci in {2, 3, 4, 5} else "center", vertical="center")
+            
+            if data_status == "MISSING":
+                c.font = Font(name="Arial", italic=True, size=9, color=C.MISSING_DATA_FG)
+            elif data_status == "MOMENTUM_ONLY":
+                if ci in RETURN_COLS_IDX_CONSOLIDATED and isinstance(val, str) and val != "—":
+                    try:
+                        num = float(val.replace('%', ''))
+                        c.font = Font(name="Arial", italic=True, size=9, color=C.POSITIVE if num >= 0 else C.NEGATIVE)
+                    except:
+                        c.font = Font(name="Arial", italic=True, size=9, color=C.MOMENTUM_ONLY_FG)
+                elif ci == 12:
+                    c.font = Font(name="Arial", bold=True, italic=True, size=9, color=score_col(val))
+                    c.fill = fill(C.ENGINE1_TINT)
+                else:
+                    c.font = Font(name="Arial", italic=True, size=9, color=C.MOMENTUM_ONLY_FG)
+            else:
+                if ci in RETURN_COLS_IDX_CONSOLIDATED and isinstance(val, str) and val != "—":
+                    try:
+                        num = float(val.replace('%', ''))
+                        c.font = Font(name="Arial", bold=is_bold, size=9, color=C.POSITIVE if num >= 0 else C.NEGATIVE)
+                    except:
+                        c.font = dfont(bold=is_bold)
+                elif ci == 12:
+                    c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
+                    c.fill = fill(C.ENGINE1_TINT)
+                elif ci == 13:
+                    c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
+                    c.fill = fill(C.ENGINE2_TINT)
+                elif ci == 14:
+                    c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
+                    c.fill = fill(C.COMP_TINT)
+                else:
+                    c.font = dfont(bold=is_bold)
+
+        # Signal column (15)
+        sig_val = signal(row["_comp"], row.get("_trend", ""), row["_e1"], row["_e2"], data_status)
+        c_sig = ws.cell(row=i, column=15, value=sig_val)
+        c_sig.border = bd
+        c_sig.fill = fill(rbg)
+        c_sig.alignment = Alignment(horizontal="center", vertical="center")
+        if data_status == "MISSING":
+            c_sig.font = Font(name="Arial", italic=True, size=9, color=C.MISSING_DATA_FG)
+        elif data_status == "MOMENTUM_ONLY":
+            c_sig.font = Font(name="Arial", bold=True, italic=True, size=9, color=C.MOMENTUM_ONLY_FG)
+        else:
+            c_sig.font = Font(name="Arial", bold=True, size=9)
+        
+        # Data Status column (16)
+        c_status = ws.cell(row=i, column=16, value=data_status)
+        c_status.border = bd
+        c_status.alignment = Alignment(horizontal="center", vertical="center")
+        if data_status == "FULL":
+            c_status.fill = fill(C.LEGEND_FULL)
+            c_status.font = Font(name="Arial", size=8, color=C.POSITIVE)
+        elif data_status == "MOMENTUM_ONLY":
+            c_status.fill = fill(C.LEGEND_MOMENTUM)
+            c_status.font = Font(name="Arial", size=8, color=C.MOMENTUM_ONLY_FG)
+        else:
+            c_status.fill = fill(C.LEGEND_MISSING)
+            c_status.font = Font(name="Arial", size=8, color=C.MISSING_DATA_FG)
+        
+        ws.row_dimensions[i].height = 16
+
+    # Column widths
+    for ci, w in enumerate(COL_WIDTHS_CONSOLIDATED, 1):
+        ws.column_dimensions[get_column_letter(ci)].width = w
+    
+    ws.auto_filter.ref = f"A4:{get_column_letter(ncols)}{data_end_row}"
+    ws.freeze_panes = "A5"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# BUILD ASSUMPTIONS SHEET
 # ══════════════════════════════════════════════════════════════════════════════
 def build_assumptions(wb, df_scored):
     ws = wb.create_sheet("📋 ASSUMPTIONS", 1)
@@ -773,9 +956,8 @@ def build_assumptions(wb, df_scored):
     ws["A1"].alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 30
 
-    # Generated timestamp
     ws.merge_cells("A2:C2")
-    ws["A2"] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | 3-Tier Data Status Classification"
+    ws["A2"] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Dynamic Formulas Enabled"
     ws["A2"].font = Font(name="Arial", italic=True, size=8.5, color=C.INFO_FG)
     ws["A2"].fill = fill(C.INFO_BG)
     ws["A2"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
@@ -786,9 +968,9 @@ def build_assumptions(wb, df_scored):
     # Data Status Legend
     r = section(r, "📊  DATA AVAILABILITY LEGEND", C.ASMP_BLEND)
     r = col_headers(r, ["Status", "Visual Style", "Description"], C.ASMP_BLEND)
-    r = kv_row(r, "✅ Full Data", "White/Ranked Colors", "All returns (1M-3Y) available - fully scored & ranked", C.LEGEND_FULL)
-    r = kv_row(r, "⚠️ Momentum Only", "Light Amber + Italic", "New fund - has 1M/3M/6M but missing 2Y/3Y CAGR", C.LEGEND_MOMENTUM)
-    r = kv_row(r, "❌ Missing Data", "Light Gray + Italic", "Missing critical short-term momentum data", C.LEGEND_MISSING)
+    r = kv_row(r, "✅ FULL", "White/Ranked Colors", "All returns (1M-3Y) available - fully scored & ranked", C.LEGEND_FULL)
+    r = kv_row(r, "⚠️ MOMENTUM_ONLY", "Light Amber + Italic", "New fund - has 1M/3M/6M but missing 2Y/3Y CAGR", C.LEGEND_MOMENTUM)
+    r = kv_row(r, "❌ MISSING", "Light Gray + Italic", "Missing critical short-term momentum data", C.LEGEND_MISSING)
     
     r += 1
     
@@ -824,17 +1006,44 @@ def build_assumptions(wb, df_scored):
     
     r += 1
     
-    # Data Stats
-    r = section(r, "📈  DATA STATISTICS", C.ASMP_BLEND)
+    # Data Stats - Using formulas that reference CONSOLIDATED sheet
+    r = section(r, "📈  DATA STATISTICS (Live from Consolidated)", C.ASMP_BLEND)
     r = col_headers(r, ["Metric", "Count", "Percentage"], C.ASMP_BLEND)
-    total = len(df_scored)
-    full_count = len(df_scored[df_scored["_data_status"] == "FULL"])
-    momentum_count = len(df_scored[df_scored["_data_status"] == "MOMENTUM_ONLY"])
-    missing_count = len(df_scored[df_scored["_data_status"] == "MISSING"])
-    r = kv_row(r, "Total Funds", str(total), "100%", C.ASMP_ROW_BL)
-    r = kv_row(r, "✅ Full Data", str(full_count), f"{full_count/total*100:.1f}%", C.LEGEND_FULL)
-    r = kv_row(r, "⚠️ Momentum Only", str(momentum_count), f"{momentum_count/total*100:.1f}%", C.LEGEND_MOMENTUM)
-    r = kv_row(r, "❌ Missing Data", str(missing_count), f"{missing_count/total*100:.1f}%", C.LEGEND_MISSING)
+    
+    # Dynamic formulas referencing CONSOLIDATED sheet
+    total_formula = '=COUNTA(\'📊 CONSOLIDATED\'!B5:B10000)'
+    full_formula = '=COUNTIF(\'📊 CONSOLIDATED\'!P5:P10000,"FULL")'
+    momentum_formula = '=COUNTIF(\'📊 CONSOLIDATED\'!P5:P10000,"MOMENTUM_ONLY")'
+    missing_formula = '=COUNTIF(\'📊 CONSOLIDATED\'!P5:P10000,"MISSING")'
+    
+    for ci, (key, formula, pct_formula) in enumerate([
+        ("Total Funds", total_formula, "100%"),
+        ("✅ Full Data", full_formula, f'=TEXT({full_formula}/{total_formula},"0.0%")'),
+        ("⚠️ Momentum Only", momentum_formula, f'=TEXT({momentum_formula}/{total_formula},"0.0%")'),
+        ("❌ Missing Data", missing_formula, f'=TEXT({missing_formula}/{total_formula},"0.0%")'),
+    ]):
+        bg_color = C.ASMP_ROW_BL if ci == 0 else (C.LEGEND_FULL if ci == 1 else (C.LEGEND_MOMENTUM if ci == 2 else C.LEGEND_MISSING))
+        
+        c1 = ws.cell(row=r, column=1, value=key)
+        c1.font = Font(name="Arial", size=9)
+        c1.fill = fill(bg_color)
+        c1.border = bd
+        c1.alignment = Alignment(horizontal="left", vertical="center")
+        
+        c2 = ws.cell(row=r, column=2, value=formula)
+        c2.font = Font(name="Arial", size=9, bold=True)
+        c2.fill = fill(bg_color)
+        c2.border = bd
+        c2.alignment = Alignment(horizontal="center", vertical="center")
+        
+        c3 = ws.cell(row=r, column=3, value=pct_formula if ci > 0 else "100%")
+        c3.font = Font(name="Arial", size=9)
+        c3.fill = fill(bg_color)
+        c3.border = bd
+        c3.alignment = Alignment(horizontal="center", vertical="center")
+        
+        ws.row_dimensions[r].height = 15
+        r += 1
     
     ws.column_dimensions["A"].width = 28
     ws.column_dimensions["B"].width = 24
@@ -850,7 +1059,6 @@ def main():
     print("⚙️ Executing Scoring Engine with 3-Tier Data Classification...")
     df_scored = score_funds(df)
     
-    # Print data status summary
     print(f"\n📊 Data Status Summary:")
     print(f"   ✅ Full Data: {len(df_scored[df_scored['_data_status'] == 'FULL'])}")
     print(f"   ⚠️ Momentum Only: {len(df_scored[df_scored['_data_status'] == 'MOMENTUM_ONLY'])}")
@@ -865,19 +1073,24 @@ def main():
     print("\n📊 Building Asset Class Summary Sheet...")
     build_summary(wb, df_scored)
     
-    print("📋 Building Assumptions Sheet with Legend...")
+    print("📋 Building Assumptions Sheet with Dynamic Formulas...")
     build_assumptions(wb, df_scored)
     
-    print("📁 Generating Category Sheets...")
+    print("📁 Generating Category Sheets with Dynamic Info Rows...")
     for cat in categories:
         cat_df = df_scored[df_scored["_cat"] == cat].sort_values("_rank")
         if not cat_df.empty:
             build_category_sheet(wb, cat, cat_df)
     
+    print("📊 Building Consolidated Sheet (All Funds)...")
+    build_consolidated_sheet(wb, df_scored)
+    
     wb.save(CONFIG.OUTPUT_FILE)
     print(f"\n✅ Done! Output: '{CONFIG.OUTPUT_FILE}'")
-    print(f"   • Summary: Ranked by Asset Class (not category)")
-    print(f"   • 3-tier styling: Full Data | Momentum Only | Missing Data")
+    print(f"   📊 Summary: Asset Class rankings")
+    print(f"   📋 Assumptions: With live formulas")
+    print(f"   📁 Category Sheets: Dynamic counts in Row 2")
+    print(f"   📊 CONSOLIDATED: All {len(df_scored)} funds in one sheet")
 
 if __name__ == "__main__":
     main()
