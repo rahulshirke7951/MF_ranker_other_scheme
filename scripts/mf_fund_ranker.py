@@ -63,15 +63,6 @@ COLUMN_MAP = {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ★ FIX #1 — TRUE PERCENT NUMBER FORMAT
-# Excel '%' multiplies by 100. Returns are now stored as DECIMAL FRACTIONS
-# (e.g. 28.04% -> 0.2804) and displayed with a genuine percent format so the
-# stored value and the displayed value are CONSISTENT, sortable and chartable.
-# ══════════════════════════════════════════════════════════════════════════════
-PCT_FMT = '+0.00%;-0.00%;0.00%'   # ★ FIX: real percent format (value stored as fraction)
-SCORE_FMT = '0.0'
-
-# ══════════════════════════════════════════════════════════════════════════════
 # ASSET TAGGING RULES - Priority-Ordered
 # ══════════════════════════════════════════════════════════════════════════════
 ASSET_TAG_RULES = [
@@ -107,6 +98,8 @@ class Colors:
     LONGTERM_FG = "FFFFFF"
     ENGINE_BG = "2D5016"
     ENGINE_FG = "FFFFFF"
+    RANK_COL_BG = "5D4037"        # ★ banner color for the rank-in-asset band
+    RANK_COL_FG = "FFFFFF"
     SIGNAL_BG = "6A1B9A"
     SIGNAL_FG = "FFFFFF"
     RANK1_BG = "FFD700"
@@ -119,6 +112,7 @@ class Colors:
     ENGINE1_TINT = "FFF3E0"
     ENGINE2_TINT = "E3F2FD"
     COMP_TINT = "F0FFF4"
+    RANK_TINT = "EFEBE9"          # ★ light tint for rank-in-asset cells
     MOMENTUM_ONLY_BG = "FFF8E1"
     MOMENTUM_ONLY_FG = "E65100"
     MISSING_DATA_BG = "ECEFF1"
@@ -137,7 +131,6 @@ class Colors:
     SECTION_PURPLE = "7B1FA2"
     SECTION_TEAL = "00695C"
     TOP5_BG = "E3F2FD"
-    ASSET_HDR_BG = "00695C"          # ★ FIX #2: asset-class group banner color
 
 C = Colors()
 
@@ -201,7 +194,6 @@ def calculate_trend_strength(row: pd.Series) -> Tuple[float, str]:
 def score_funds(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
-    # Returns are kept in PERCENT-POINT units internally for scoring/percentiles
     df["_r1m"] = to_num(df[COLUMN_MAP["return_1m"]]).fillna(0)
     df["_r3m"] = to_num(df[COLUMN_MAP["return_3m"]]).fillna(0)
     df["_r6m"] = to_num(df[COLUMN_MAP["return_6m"]]).fillna(0)
@@ -336,18 +328,6 @@ def border() -> Border:
     s = Side(style='thin', color=C.BORDER)
     return Border(left=s, right=s, top=s, bottom=s)
 
-# ★ FIX #1 — Convert a percent-point value (28.04) to a true fraction (0.2804)
-#            so the genuine '0.00%' Excel format renders it correctly and the
-#            stored number is mathematically consistent.
-def pct_value(val, is_missing: bool = False) -> float:
-    """Return a DECIMAL FRACTION for a true Excel percent format. 0 for missing."""
-    if is_missing or pd.isna(val) or val is None:
-        return 0.0
-    try:
-        return round(float(val) / 100.0, 6)   # 28.04 -> 0.2804  ★ FIX
-    except Exception:
-        return 0.0
-
 def score_col(val) -> str:
     try:
         v = float(val)
@@ -407,33 +387,24 @@ COL_HEADERS_SUMMARY = [
     "Momentum\nSignal", "Quality\nSignal", "Composite\nSignal"
 ]
 
+# ★ Consolidated: 3 EXTRA rank columns (O, P, Q) after Composite Score (N)
 COL_HEADERS_CONSOLIDATED = [
     "Rank", "Scheme Name", "AMC", "Category", "Asset Class",
     "1M\nReturn", "3M\nReturn", "6M\nReturn",
     "1Y\nReturn", "2Y\nCAGR", "3Y\nCAGR",
     "Engine 1\n(Momentum)", "Engine 2\n(Quality)", "Composite\nScore",
+    "E1 Rank\n(in Asset)", "E2 Rank\n(in Asset)", "Comp Rank\n(in Asset)",   # ★ NEW
     "Momentum\nSignal", "Quality\nSignal", "Composite\nSignal", "Data\nStatus"
-]
-
-# ★ FIX #2 — Asset Class Detail sheet uses the SAME schema as the Summary sheet
-#            (Rank, Asset Class, Scheme, AMC, Category, returns, engines, signals)
-COL_HEADERS_ASSET = [
-    "Rank", "Asset Class", "Scheme Name", "AMC", "Category",
-    "1M\nReturn", "3M\nReturn", "6M\nReturn",
-    "1Y\nReturn", "2Y\nCAGR", "3Y\nCAGR",
-    "Engine 1\n(Momentum)", "Engine 2\n(Quality)", "Composite\nScore",
-    "Momentum\nSignal", "Quality\nSignal", "Composite\nSignal"
 ]
 
 COL_WIDTHS_CATEGORY = [6, 45, 20, 16, 9, 9, 9, 9, 9, 9, 12, 12, 12, 12, 12, 14, 12]
 COL_WIDTHS_SUMMARY = [6, 16, 42, 20, 14, 9, 9, 9, 9, 9, 9, 12, 12, 12, 12, 12, 14]
-COL_WIDTHS_CONSOLIDATED = [6, 42, 20, 14, 14, 9, 9, 9, 9, 9, 9, 12, 12, 12, 12, 12, 14, 12]
-COL_WIDTHS_ASSET = [6, 18, 46, 22, 14, 9, 9, 9, 9, 9, 9, 12, 12, 12, 12, 12, 14]  # ★ FIX #2
+# ★ 21 widths (added 3 for rank columns)
+COL_WIDTHS_CONSOLIDATED = [6, 42, 20, 14, 14, 9, 9, 9, 9, 9, 9, 12, 12, 12, 11, 11, 11, 12, 12, 14, 12]
 
 RETURN_COLS_IDX_CAT = {5, 6, 7, 8, 9, 10}
 RETURN_COLS_IDX_SUMMARY = {6, 7, 8, 9, 10, 11}
 RETURN_COLS_IDX_CONSOLIDATED = {6, 7, 8, 9, 10, 11}
-RETURN_COLS_IDX_ASSET = {6, 7, 8, 9, 10, 11}   # ★ FIX #2
 
 MOMENTUM_COLS_CAT = (5, 7)
 LONGTERM_COLS_CAT = (8, 10)
@@ -521,14 +492,13 @@ def build_category_sheet(wb, cat, cat_df):
         qual_sig = quality_signal(row["_e2"], data_status)
         comp_sig = composite_signal(row["_comp"], row.get("_trend", ""), row["_e1"], row["_e2"], data_status)
 
-        # ★ FIX #1: returns stored as fractions via pct_value()
         vals = [
             rank_val,
             row.get(COLUMN_MAP["scheme_name"], ""),
             row.get(COLUMN_MAP["amc"], ""),
             row["_asset_class"],
-            pct_value(row["_r1m"]), pct_value(row["_r3m"]), pct_value(row["_r6m"]),
-            pct_value(row["_r1y"]), pct_value(row["_r2y_cagr"]), pct_value(row["_r3y"]),
+            row["_r1m"], row["_r3m"], row["_r6m"],
+            row["_r1y"], row["_r2y_cagr"], row["_r3y"],
             e1_val, e2_val, comp_val,
             mom_sig, qual_sig, comp_sig,
             data_status
@@ -541,21 +511,21 @@ def build_category_sheet(wb, cat, cat_df):
             c.alignment = Alignment(horizontal="left" if ci in {2, 3, 4} else "center", vertical="center")
 
             if ci in RETURN_COLS_IDX_CAT:
-                c.number_format = PCT_FMT      # ★ FIX: true percent format
+                c.number_format = '+0.00%;-0.00%;0.00%'
                 if isinstance(val, (int, float)):
                     c.font = Font(name="Arial", bold=is_bold, size=9, color=C.POSITIVE if val >= 0 else C.NEGATIVE)
             elif ci == 11:
                 c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                 c.fill = fill(C.ENGINE1_TINT)
-                c.number_format = SCORE_FMT
+                c.number_format = '0.0'
             elif ci == 12:
                 c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                 c.fill = fill(C.ENGINE2_TINT)
-                c.number_format = SCORE_FMT
+                c.number_format = '0.0'
             elif ci == 13:
                 c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                 c.fill = fill(C.COMP_TINT)
-                c.number_format = SCORE_FMT
+                c.number_format = '0.0'
             elif ci in {14, 15, 16}:
                 c.font = Font(name="Arial", bold=True, size=8, italic=is_italic)
             elif ci == 17:
@@ -666,15 +636,14 @@ def build_summary(wb, df_scored):
         qual_sig = quality_signal(top["_e2"], data_status)
         comp_sig = composite_signal(top["_comp"], top.get("_trend", ""), top["_e1"], top["_e2"], data_status)
 
-        # ★ FIX #1: returns stored as fractions
         vals = [
             rank_val,
             asset_class,
             top.get(COLUMN_MAP["scheme_name"], ""),
             top.get(COLUMN_MAP["amc"], ""),
             top["_cat"],
-            pct_value(top["_r1m"]), pct_value(top["_r3m"]), pct_value(top["_r6m"]),
-            pct_value(top["_r1y"]), pct_value(top["_r2y_cagr"]), pct_value(top["_r3y"]),
+            top["_r1m"], top["_r3m"], top["_r6m"],
+            top["_r1y"], top["_r2y_cagr"], top["_r3y"],
             e1_val, e2_val, comp_val,
             mom_sig, qual_sig, comp_sig
         ]
@@ -686,21 +655,21 @@ def build_summary(wb, df_scored):
             c.alignment = Alignment(horizontal="left" if ci in {2, 3, 4, 5} else "center", vertical="center")
 
             if ci in RETURN_COLS_IDX_SUMMARY:
-                c.number_format = PCT_FMT      # ★ FIX
+                c.number_format = '+0.00%;-0.00%;0.00%'
                 if isinstance(val, (int, float)):
                     c.font = Font(name="Arial", size=9, color=C.POSITIVE if val >= 0 else C.NEGATIVE)
             elif ci == 12:
                 c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                 c.fill = fill(C.ENGINE1_TINT)
-                c.number_format = SCORE_FMT
+                c.number_format = '0.0'
             elif ci == 13:
                 c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                 c.fill = fill(C.ENGINE2_TINT)
-                c.number_format = SCORE_FMT
+                c.number_format = '0.0'
             elif ci == 14:
                 c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                 c.fill = fill(C.COMP_TINT)
-                c.number_format = SCORE_FMT
+                c.number_format = '0.0'
             elif ci in {15, 16, 17}:
                 c.font = Font(name="Arial", bold=True, size=8)
             else:
@@ -715,182 +684,12 @@ def build_summary(wb, df_scored):
     ws.freeze_panes = "A5"
 
 # ══════════════════════════════════════════════════════════════════════════════
-# ★ FIX #2 — NEW: BUILD ASSET CLASS DETAIL SHEET
-# Standalone sheet matching the Summary look & feel, but showing the SAME
-# detailed rows that exist in the individual asset-class sheets — every fund,
-# grouped under an asset-class banner, ranked within its asset class.
-# ══════════════════════════════════════════════════════════════════════════════
-def build_asset_class_sheet(wb, df_scored):
-    ws = wb.create_sheet("🎯 ASSET CLASS ANALYSIS", 2)   # placed right after Assumptions
-    bd = border()
-    ncols = len(COL_HEADERS_ASSET)
-
-    # ---- Title (same dark banner as Summary) ----
-    ws.merge_cells(f"A1:{get_column_letter(ncols)}1")
-    c = ws["A1"]
-    c.value = "🎯 ASSET CLASS ANALYSIS — ALL FUNDS BY ASSET CLASS"
-    c.font = Font(name="Arial", bold=True, size=15, color=C.TITLE_FG)
-    c.fill = fill(C.TITLE_BG)
-    c.alignment = Alignment(horizontal="center", vertical="center")
-    ws.row_dimensions[1].height = 34
-
-    # ---- Dynamic info row (placeholder counts filled after we know last row) ----
-    info_cell = ws["A2"]
-    ws.merge_cells(f"A2:{get_column_letter(ncols)}2")
-    info_cell.font = Font(name="Arial", italic=True, size=8.5, color=C.INFO_FG)
-    info_cell.fill = fill(C.INFO_BG)
-    info_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.row_dimensions[2].height = 16
-
-    # ---- Group header band (row 3) identical to Summary ----
-    for ci in range(1, 6):
-        ws.cell(row=3, column=ci).fill = fill(C.COL_HDR_BG)
-        ws.cell(row=3, column=ci).border = bd
-    for g_start, g_end, label, bg, fg in [
-        (6, 8, "◄  Momentum  ►", C.MOMENTUM_BG, C.MOMENTUM_FG),
-        (9, 11, "◄  Long-Term  ►", C.LONGTERM_BG, C.LONGTERM_FG),
-        (12, 14, "◄  Engine Scores  ►", C.ENGINE_BG, C.ENGINE_FG),
-        (15, 17, "◄  Signals  ►", C.SIGNAL_BG, C.SIGNAL_FG),
-    ]:
-        ws.merge_cells(f"{get_column_letter(g_start)}3:{get_column_letter(g_end)}3")
-        cell = ws.cell(row=3, column=g_start, value=label)
-        cell.font = hfont(color=fg)
-        cell.fill = fill(bg)
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        for ci in range(g_start, g_end + 1):
-            ws.cell(row=3, column=ci).fill = fill(bg)
-            ws.cell(row=3, column=ci).border = bd
-    ws.row_dimensions[3].height = 18
-
-    # ---- Column headers (row 4) ----
-    for ci, hdr in enumerate(COL_HEADERS_ASSET, 1):
-        c = ws.cell(row=4, column=ci, value=hdr)
-        c.font = hfont()
-        c.fill = fill(C.COL_HDR_BG)
-        c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-        c.border = bd
-    ws.row_dimensions[4].height = 28
-
-    # ---- Data: every fund, grouped & ranked within each asset class ----
-    asset_classes = sorted(df_scored["_asset_class"].unique())
-    r = 5
-    data_start_row = 5
-
-    for asset_class in asset_classes:
-        asset_df = df_scored[df_scored["_asset_class"] == asset_class].copy()
-        asset_df = asset_df.sort_values(
-            ["_data_status", "_comp"],
-            ascending=[True, False],
-            key=lambda x: x.map({"FULL": 0, "MOMENTUM_ONLY": 1, "MISSING": 2}) if x.name == "_data_status" else x
-        ).reset_index(drop=True)
-        if asset_df.empty:
-            continue
-
-        # Asset-class banner row spanning all columns (teal, like the section bands)
-        ws.merge_cells(f"A{r}:{get_column_letter(ncols)}{r}")
-        bc = ws.cell(row=r, column=1, value=f"►  {asset_class}   ({len(asset_df)} funds)")
-        bc.font = Font(name="Arial", bold=True, size=10, color="FFFFFF")
-        bc.fill = fill(C.ASSET_HDR_BG)
-        bc.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-        for ci in range(1, ncols + 1):
-            ws.cell(row=r, column=ci).border = bd
-            ws.cell(row=r, column=ci).fill = fill(C.ASSET_HDR_BG)
-        ws.row_dimensions[r].height = 20
-        r += 1
-
-        for local_rank, (_, row) in enumerate(asset_df.iterrows(), 1):
-            data_status = row["_data_status"]
-
-            # rank style based on within-asset-class position
-            if data_status == "MISSING":
-                rbg, is_italic, is_bold = C.MISSING_DATA_BG, True, False
-            elif data_status == "MOMENTUM_ONLY":
-                rbg, is_italic, is_bold = C.MOMENTUM_ONLY_BG, True, False
-            else:
-                if local_rank == 1:
-                    rbg, is_bold = C.RANK1_BG, True
-                elif local_rank == 2:
-                    rbg, is_bold = C.RANK2_BG, True
-                elif local_rank == 3:
-                    rbg, is_bold = C.RANK3_BG, True
-                else:
-                    rbg, is_bold = (C.ALT_ROW if r % 2 == 0 else C.WHITE), False
-                is_italic = False
-
-            e1_val = round(row["_e1"], 1)
-            e2_val = round(row["_e2"], 1) if data_status == "FULL" else 0
-            comp_val = round(row["_comp"], 1)
-
-            mom_sig = momentum_signal(row["_e1"], data_status)
-            qual_sig = quality_signal(row["_e2"], data_status)
-            comp_sig = composite_signal(row["_comp"], row.get("_trend", ""), row["_e1"], row["_e2"], data_status)
-
-            # ★ FIX #1: returns stored as fractions
-            vals = [
-                local_rank,
-                asset_class,
-                row.get(COLUMN_MAP["scheme_name"], ""),
-                row.get(COLUMN_MAP["amc"], ""),
-                row["_cat"],
-                pct_value(row["_r1m"]), pct_value(row["_r3m"]), pct_value(row["_r6m"]),
-                pct_value(row["_r1y"]), pct_value(row["_r2y_cagr"]), pct_value(row["_r3y"]),
-                e1_val, e2_val, comp_val,
-                mom_sig, qual_sig, comp_sig
-            ]
-
-            for ci, val in enumerate(vals, 1):
-                c = ws.cell(row=r, column=ci, value=val)
-                c.border = bd
-                c.fill = fill(rbg)
-                c.alignment = Alignment(horizontal="left" if ci in {2, 3, 4, 5} else "center", vertical="center")
-
-                if ci in RETURN_COLS_IDX_ASSET:
-                    c.number_format = PCT_FMT      # ★ FIX: true percent format
-                    if isinstance(val, (int, float)):
-                        c.font = Font(name="Arial", bold=is_bold, size=9, color=C.POSITIVE if val >= 0 else C.NEGATIVE)
-                elif ci == 12:
-                    c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
-                    c.fill = fill(C.ENGINE1_TINT)
-                    c.number_format = SCORE_FMT
-                elif ci == 13:
-                    c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
-                    c.fill = fill(C.ENGINE2_TINT)
-                    c.number_format = SCORE_FMT
-                elif ci == 14:
-                    c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
-                    c.fill = fill(C.COMP_TINT)
-                    c.number_format = SCORE_FMT
-                elif ci in {15, 16, 17}:
-                    c.font = Font(name="Arial", bold=True, size=8, italic=is_italic)
-                else:
-                    c.font = dfont(bold=is_bold)
-
-            ws.row_dimensions[r].height = 16
-            r += 1
-
-    data_end_row = r - 1
-
-    # Fill the dynamic info row now that we know the data extent.
-    # Composite Signal lives in column Q (17); we count Strong Buy+ across full range.
-    info_cell.value = (
-        f'="All Funds by Asset Class | {int(COMPOSITE_BLEND["engine1_momentum"]*100)}% Momentum + '
-        f'{int(COMPOSITE_BLEND["engine2_quality"]*100)}% Quality | '
-        f'Asset Classes: {len(asset_classes)} | '
-        f'⭐ Strong Buy+: "&COUNTIF(Q{data_start_row}:Q{data_end_row},"*Strong*")'
-    )
-
-    for ci, w in enumerate(COL_WIDTHS_ASSET, 1):
-        ws.column_dimensions[get_column_letter(ci)].width = w
-
-    ws.freeze_panes = "A5"
-
-# ══════════════════════════════════════════════════════════════════════════════
-# BUILD CONSOLIDATED SHEET
+# BUILD CONSOLIDATED SHEET  ★ with 3 DYNAMIC (whole-column) rank columns
 # ══════════════════════════════════════════════════════════════════════════════
 def build_consolidated_sheet(wb, df_scored):
     ws = wb.create_sheet("📊 CONSOLIDATED")
     bd = border()
-    ncols = len(COL_HEADERS_CONSOLIDATED)
+    ncols = len(COL_HEADERS_CONSOLIDATED)   # now 21
 
     df_all = df_scored.copy()
     df_all = df_all.sort_values(
@@ -901,8 +700,15 @@ def build_consolidated_sheet(wb, df_scored):
 
     data_start_row = 5
     data_end_row = data_start_row + len(df_all) - 1
-    status_col = ncols
+    status_col = ncols   # column 21 (U)
 
+    # Column letters used inside the DYNAMIC whole-column rank formulas
+    ASSET_COL = "E"   # Asset Class
+    E1_COL = "L"      # Engine 1 score
+    E2_COL = "M"      # Engine 2 score
+    COMP_COL = "N"    # Composite score
+
+    # ---- Title ----
     ws.merge_cells(f"A1:{get_column_letter(ncols)}1")
     c = ws["A1"]
     c.value = "📊 CONSOLIDATED VIEW — ALL FUNDS RANKED"
@@ -911,14 +717,16 @@ def build_consolidated_sheet(wb, df_scored):
     c.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 34
 
+    # ---- Dynamic info row (Data Status now in column U) — whole-column counts ----
     e1_pct = int(COMPOSITE_BLEND["engine1_momentum"] * 100)
     e2_pct = int(COMPOSITE_BLEND["engine2_quality"] * 100)
+    SC = get_column_letter(status_col)   # "U"
     dynamic_formula = (
         f'="All Funds Consolidated | {e1_pct}% Momentum + {e2_pct}% Quality | '
-        f'✅ Full: "&COUNTIF(R{data_start_row}:R{data_end_row},"FULL")&" | '
-        f'⚠️ Momentum: "&COUNTIF(R{data_start_row}:R{data_end_row},"MOMENTUM_ONLY")&" | '
-        f'❌ Missing: "&COUNTIF(R{data_start_row}:R{data_end_row},"MISSING")&" | '
-        f'Total: "&COUNTA(B{data_start_row}:B{data_end_row})'
+        f'✅ Full: "&COUNTIF(${SC}:${SC},"FULL")&" | '
+        f'⚠️ Momentum: "&COUNTIF(${SC}:${SC},"MOMENTUM_ONLY")&" | '
+        f'❌ Missing: "&COUNTIF(${SC}:${SC},"MISSING")&" | '
+        f'Total: "&(COUNTA($B:$B)-4)'   # -4 = header rows in column B
     )
     ws.merge_cells(f"A2:{get_column_letter(ncols)}2")
     c = ws["A2"]
@@ -928,15 +736,18 @@ def build_consolidated_sheet(wb, df_scored):
     c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
     ws.row_dimensions[2].height = 16
 
+    # ---- Group header band (row 3) ----
     for ci in range(1, 6):
         ws.cell(row=3, column=ci).fill = fill(C.COL_HDR_BG)
         ws.cell(row=3, column=ci).border = bd
 
+    # ★ new "Rank in Asset Class" band at 15-17; Signals shifted to 18-20
     for g_start, g_end, label, bg, fg in [
         (6, 8, "◄  Momentum  ►", C.MOMENTUM_BG, C.MOMENTUM_FG),
         (9, 11, "◄  Long-Term  ►", C.LONGTERM_BG, C.LONGTERM_FG),
         (12, 14, "◄  Engine Scores  ►", C.ENGINE_BG, C.ENGINE_FG),
-        (15, 17, "◄  Signals  ►", C.SIGNAL_BG, C.SIGNAL_FG),
+        (15, 17, "◄  Rank in Asset Class  ►", C.RANK_COL_BG, C.RANK_COL_FG),   # ★ NEW
+        (18, 20, "◄  Signals  ►", C.SIGNAL_BG, C.SIGNAL_FG),
     ]:
         ws.merge_cells(f"{get_column_letter(g_start)}3:{get_column_letter(g_end)}3")
         cell = ws.cell(row=3, column=g_start, value=label)
@@ -951,6 +762,7 @@ def build_consolidated_sheet(wb, df_scored):
     ws.cell(row=3, column=status_col).border = bd
     ws.row_dimensions[3].height = 18
 
+    # ---- Column headers (row 4) ----
     for ci, hdr in enumerate(COL_HEADERS_CONSOLIDATED, 1):
         c = ws.cell(row=4, column=ci, value=hdr)
         c.font = hfont()
@@ -959,6 +771,7 @@ def build_consolidated_sheet(wb, df_scored):
         c.border = bd
     ws.row_dimensions[4].height = 28
 
+    # ---- Data rows ----
     global_rank = 1
     for i, (_, row) in enumerate(df_all.iterrows(), data_start_row):
         data_status = row["_data_status"]
@@ -990,18 +803,24 @@ def build_consolidated_sheet(wb, df_scored):
         qual_sig = quality_signal(row["_e2"], data_status)
         comp_sig = composite_signal(row["_comp"], row.get("_trend", ""), row["_e1"], row["_e2"], data_status)
 
-        # ★ FIX #1: returns stored as fractions
+        # ★ DYNAMIC whole-column rank formulas — auto-expand, no fixed end row.
+        # "How many funds in the same Asset Class score higher than me? + 1"
+        e1_rank_formula   = f'=COUNTIFS(${ASSET_COL}:${ASSET_COL},${ASSET_COL}{i},${E1_COL}:${E1_COL},">"&${E1_COL}{i})+1'
+        e2_rank_formula   = f'=COUNTIFS(${ASSET_COL}:${ASSET_COL},${ASSET_COL}{i},${E2_COL}:${E2_COL},">"&${E2_COL}{i})+1'
+        comp_rank_formula = f'=COUNTIFS(${ASSET_COL}:${ASSET_COL},${ASSET_COL}{i},${COMP_COL}:${COMP_COL},">"&${COMP_COL}{i})+1'
+
         vals = [
-            rank_val,
-            row.get(COLUMN_MAP["scheme_name"], ""),
-            row.get(COLUMN_MAP["amc"], ""),
-            row["_cat"],
-            row["_asset_class"],
-            pct_value(row["_r1m"]), pct_value(row["_r3m"]), pct_value(row["_r6m"]),
-            pct_value(row["_r1y"]), pct_value(row["_r2y_cagr"]), pct_value(row["_r3y"]),
-            e1_val, e2_val, comp_val,
-            mom_sig, qual_sig, comp_sig,
-            data_status
+            rank_val,                                    # 1  A
+            row.get(COLUMN_MAP["scheme_name"], ""),      # 2  B
+            row.get(COLUMN_MAP["amc"], ""),              # 3  C
+            row["_cat"],                                 # 4  D
+            row["_asset_class"],                         # 5  E
+            row["_r1m"], row["_r3m"], row["_r6m"],       # 6-8  F-H
+            row["_r1y"], row["_r2y_cagr"], row["_r3y"],  # 9-11 I-K
+            e1_val, e2_val, comp_val,                    # 12-14 L-N
+            e1_rank_formula, e2_rank_formula, comp_rank_formula,  # ★ 15-17 O-Q
+            mom_sig, qual_sig, comp_sig,                 # 18-20 R-T
+            data_status                                  # 21    U
         ]
 
         for ci, val in enumerate(vals, 1):
@@ -1011,24 +830,28 @@ def build_consolidated_sheet(wb, df_scored):
             c.alignment = Alignment(horizontal="left" if ci in {2, 3, 4, 5} else "center", vertical="center")
 
             if ci in RETURN_COLS_IDX_CONSOLIDATED:
-                c.number_format = PCT_FMT      # ★ FIX
+                c.number_format = '+0.00%;-0.00%;0.00%'
                 if isinstance(val, (int, float)):
                     c.font = Font(name="Arial", bold=is_bold, size=9, color=C.POSITIVE if val >= 0 else C.NEGATIVE)
             elif ci == 12:
                 c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                 c.fill = fill(C.ENGINE1_TINT)
-                c.number_format = SCORE_FMT
+                c.number_format = '0.0'
             elif ci == 13:
                 c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                 c.fill = fill(C.ENGINE2_TINT)
-                c.number_format = SCORE_FMT
+                c.number_format = '0.0'
             elif ci == 14:
                 c.font = Font(name="Arial", bold=True, size=9, color=score_col(val))
                 c.fill = fill(C.COMP_TINT)
-                c.number_format = SCORE_FMT
-            elif ci in {15, 16, 17}:
+                c.number_format = '0.0'
+            elif ci in {15, 16, 17}:   # ★ DYNAMIC Rank-in-asset columns
+                c.font = Font(name="Arial", bold=True, size=9, color="000000")
+                c.fill = fill(C.RANK_TINT)
+                c.number_format = '0'
+            elif ci in {18, 19, 20}:   # Signals (shifted)
                 c.font = Font(name="Arial", bold=True, size=8, italic=is_italic)
-            elif ci == 18:
+            elif ci == 21:             # Data Status (shifted)
                 if data_status == "FULL":
                     c.font = Font(name="Arial", bold=True, size=8, color=C.STATUS_FULL)
                     c.fill = fill(C.LEGEND_FULL)
@@ -1051,8 +874,7 @@ def build_consolidated_sheet(wb, df_scored):
 
 # ══════════════════════════════════════════════════════════════════════════════
 # BUILD COMPREHENSIVE ASSUMPTIONS SHEET
-# (Section 12 "Top 5 per Asset Class" REMOVED — that content now lives in the
-#  dedicated 🎯 ASSET CLASS ANALYSIS sheet.)   ★ FIX #2
+# (Top-5-by-asset content REMOVED; dynamic rank columns documented.) ★
 # ══════════════════════════════════════════════════════════════════════════════
 def build_assumptions(wb, df_scored):
     ws = wb.create_sheet("📋 ASSUMPTIONS", 1)
@@ -1099,8 +921,7 @@ def build_assumptions(wb, df_scored):
     ws.row_dimensions[1].height = 32
 
     ws.merge_cells("A2:D2")
-    # ★ FIX #1: note updated — values now stored as true decimal fractions
-    ws["A2"] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Comprehensive Documentation | Returns stored as decimal fractions w/ true % format (0 = Missing)"
+    ws["A2"] = f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | Comprehensive Documentation | All Values Numeric (0 = Missing)"
     ws["A2"].font = Font(name="Arial", italic=True, size=8.5, color=C.INFO_FG)
     ws["A2"].fill = fill(C.INFO_BG)
     ws["A2"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
@@ -1177,6 +998,15 @@ def build_assumptions(wb, df_scored):
     r = kv_row(r, "4. Data Status Sort", "FULL → MOMENTUM → MISSING", "Global consolidated view", "Best data quality first", C.ASMP_ROW_BL)
     r += 1
 
+    # ★ Documentation for the DYNAMIC rank-in-asset-class columns
+    r = section(r, "🏅  RANK IN ASSET CLASS (Consolidated Sheet — Dynamic)", C.RANK_COL_BG)
+    r = col_headers(r, ["Column", "Excel Formula (whole-column)", "Meaning", "How to Use"], C.RANK_COL_BG)
+    r = kv_row(r, "E1 Rank (in Asset)", '=COUNTIFS($E:$E,$E5,$L:$L,">"&$L5)+1', "Rank by Engine 1 within same Asset Class", "Filter by Asset Class, sort ascending", C.ASMP_ROW_BL)
+    r = kv_row(r, "E2 Rank (in Asset)", '=COUNTIFS($E:$E,$E5,$M:$M,">"&$M5)+1', "Rank by Engine 2 within same Asset Class", "Filter by Asset Class, sort ascending", C.ASMP_ROW_BL)
+    r = kv_row(r, "Comp Rank (in Asset)", '=COUNTIFS($E:$E,$E5,$N:$N,">"&$N5)+1', "Rank by Composite within same Asset Class", "Rank 1 = best fund in that Asset Class", C.ASMP_ROW_BL)
+    r = kv_row(r, "Note", "Whole-column refs ($E:$E)", "Fully dynamic — auto-expands with new rows", "Replaces the old Asset Class Analysis sheet", C.LEGEND_FULL)
+    r += 1
+
     r = section(r, "🏷️  ASSET CLASS TAGGING (Priority Order)", C.SECTION_BLUE)
     r = col_headers(r, ["Priority", "Asset Class", "Keywords", "Example Match"], C.SECTION_BLUE)
     for rule in ASSET_TAG_RULES:
@@ -1218,12 +1048,13 @@ def build_assumptions(wb, df_scored):
     r += 1
 
     r = section(r, "📈  DATA STATISTICS (Live)", C.ASMP_BLEND)
-    r = col_headers(r, ["Metric", "Count", "Formula", "Notes"], C.ASMP_BLEND)
+    r = col_headers(r, ["Metric", "Count", "Share", "Notes"], C.ASMP_BLEND)
 
-    total_formula = '=COUNTA(\'📊 CONSOLIDATED\'!B5:B10000)'
-    full_formula = '=COUNTIF(\'📊 CONSOLIDATED\'!R5:R10000,"FULL")'
-    momentum_formula = '=COUNTIF(\'📊 CONSOLIDATED\'!R5:R10000,"MOMENTUM_ONLY")'
-    missing_formula = '=COUNTIF(\'📊 CONSOLIDATED\'!R5:R10000,"MISSING")'
+    # ★ Data Status now in column U on Consolidated; whole-column dynamic refs
+    total_formula = "=COUNTA('📊 CONSOLIDATED'!$B:$B)-4"
+    full_formula = '=COUNTIF(\'📊 CONSOLIDATED\'!$U:$U,"FULL")'
+    momentum_formula = '=COUNTIF(\'📊 CONSOLIDATED\'!$U:$U,"MOMENTUM_ONLY")'
+    missing_formula = '=COUNTIF(\'📊 CONSOLIDATED\'!$U:$U,"MISSING")'
 
     for key, formula, note, bg_color in [
         ("Total Funds", total_formula, "All funds in analysis", C.ASMP_ROW_BL),
@@ -1242,7 +1073,6 @@ def build_assumptions(wb, df_scored):
         c2.border = bd
         c2.alignment = Alignment(horizontal="center")
 
-        # ★ FIX: percentage share via a true percent format instead of TEXT()
         if key != "Total Funds":
             c3 = ws.cell(row=r, column=3, value=f'={formula}/{total_formula}')
             c3.number_format = '0.0%'
@@ -1262,23 +1092,13 @@ def build_assumptions(wb, df_scored):
         ws.row_dimensions[r].height = 18
         r += 1
 
-    r += 1
-
-    # ★ FIX #2: Section 12 (Top 5 per Asset Class) removed.
-    #           Pointer note added directing users to the new dedicated sheet.
-    r = section(r, "🎯  ASSET CLASS ANALYSIS", C.CONSOLIDATED_BG)
-    r = kv_row(r, "See dedicated sheet",
-               "🎯 ASSET CLASS ANALYSIS",
-               "All funds grouped & ranked by asset class (Summary look & feel)",
-               "Detailed rows like the individual asset-class sheets", C.ASMP_ROW_BL)
-
     ws.column_dimensions["A"].width = 28
     ws.column_dimensions["B"].width = 48
     ws.column_dimensions["C"].width = 32
     ws.column_dimensions["D"].width = 40
 
 # ══════════════════════════════════════════════════════════════════════════════
-# MAIN EXECUTOR
+# MAIN EXECUTOR  ★ Asset Class Analysis & Top-5 sheets REMOVED
 # ══════════════════════════════════════════════════════════════════════════════
 def main():
     print("🚀 Loading data matrix...")
@@ -1304,25 +1124,22 @@ def main():
     print("📋 Building Assumptions Sheet...")
     build_assumptions(wb, df_scored)
 
-    print("🎯 Building Asset Class Analysis Sheet...")   # ★ FIX #2
-    build_asset_class_sheet(wb, df_scored)
-
     print("📁 Generating Category Sheets...")
     for cat in categories:
         cat_df = df_scored[df_scored["_cat"] == cat].sort_values("_rank")
         if not cat_df.empty:
             build_category_sheet(wb, cat, cat_df)
 
-    print("📊 Building Consolidated Sheet...")
+    print("📊 Building Consolidated Sheet (with DYNAMIC Rank-in-Asset columns)...")
     build_consolidated_sheet(wb, df_scored)
 
     wb.save(CONFIG.OUTPUT_FILE)
     print(f"\n✅ Done! Output: '{CONFIG.OUTPUT_FILE}'")
     print("   📊 Summary: Asset Class rankings")
-    print("   📋 Assumptions: Complete methodology")
-    print("   🎯 Asset Class Analysis: All funds by asset class (NEW)")
-    print("   📁 Category Sheets: True percent values")
-    print(f"   📊 CONSOLIDATED: All {len(df_scored)} funds")
+    print("   📋 Assumptions: Methodology + dynamic Rank-in-Asset docs")
+    print("   📁 Category Sheets: Per-category rankings")
+    print(f"   📊 CONSOLIDATED: All {len(df_scored)} funds + E1/E2/Composite rank within Asset Class (whole-column dynamic)")
+    print("   🚫 Asset Class Analysis & Top-5 sheets REMOVED (replaced by dynamic rank columns)")
 
 if __name__ == "__main__":
     main()
