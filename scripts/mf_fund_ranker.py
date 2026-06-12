@@ -511,7 +511,7 @@ def build_category_sheet(wb, cat, cat_df):
             c.alignment = Alignment(horizontal="left" if ci in {2, 3, 4} else "center", vertical="center")
 
             if ci in RETURN_COLS_IDX_CAT:
-                c.number_format = '+0.00%;-0.00%;0.00%'
+                c.number_format = '0.00'
                 if isinstance(val, (int, float)):
                     c.font = Font(name="Arial", bold=is_bold, size=9, color=C.POSITIVE if val >= 0 else C.NEGATIVE)
             elif ci == 11:
@@ -655,7 +655,7 @@ def build_summary(wb, df_scored):
             c.alignment = Alignment(horizontal="left" if ci in {2, 3, 4, 5} else "center", vertical="center")
 
             if ci in RETURN_COLS_IDX_SUMMARY:
-                c.number_format = '+0.00%;-0.00%;0.00%'
+                c.number_format = '0.00'
                 if isinstance(val, (int, float)):
                     c.font = Font(name="Arial", size=9, color=C.POSITIVE if val >= 0 else C.NEGATIVE)
             elif ci == 12:
@@ -830,7 +830,7 @@ def build_consolidated_sheet(wb, df_scored):
             c.alignment = Alignment(horizontal="left" if ci in {2, 3, 4, 5} else "center", vertical="center")
 
             if ci in RETURN_COLS_IDX_CONSOLIDATED:
-                c.number_format = '+0.00%;-0.00%;0.00%'
+                c.number_format = '0.00'
                 if isinstance(val, (int, float)):
                     c.font = Font(name="Arial", bold=is_bold, size=9, color=C.POSITIVE if val >= 0 else C.NEGATIVE)
             elif ci == 12:
