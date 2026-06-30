@@ -726,7 +726,8 @@ def build_consolidated_sheet(wb, df_scored):
         f'✅ Full: "&COUNTIF(${SC}:${SC},"FULL")&" | '
         f'⚠️ Momentum: "&COUNTIF(${SC}:${SC},"MOMENTUM_ONLY")&" | '
         f'❌ Missing: "&COUNTIF(${SC}:${SC},"MISSING")&" | '
-        f'Total: "&(COUNTA($B:$B)-4)'   # -4 = header rows in column B
+        f'Total: "&COUNTA(B{data_start_row}:B{data_end_row})'
+        # f'Total: "&(COUNTA($B:$B)-4)'   # -4 = header rows in column B
     )
     ws.merge_cells(f"A2:{get_column_letter(ncols)}2")
     c = ws["A2"]
